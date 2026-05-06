@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     SENTRY_DSN: HttpUrl | None = None
     AUTO_MIGRATE_ON_STARTUP: bool = True
     AUTO_SEED_ON_STARTUP: bool = True
+    AUTO_BOOTSTRAP_EMPTY_DB_WITH_METADATA: bool = True
     AUTO_CREATE_TABLES_IF_NO_MIGRATIONS: bool = True
 
     # ── MySQL ──────────────────────────────────────────────────────────────

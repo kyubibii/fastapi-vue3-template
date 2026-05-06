@@ -224,6 +224,7 @@ ENVIRONMENT=development
 ```env
 AUTO_MIGRATE_ON_STARTUP=true          # 自动执行 Alembic 升级
 AUTO_SEED_ON_STARTUP=true             # 自动注入初始数据
+AUTO_BOOTSTRAP_EMPTY_DB_WITH_METADATA=true # 有迁移文件但目标库无业务表时：create_all + stamp head
 AUTO_CREATE_TABLES_IF_NO_MIGRATIONS=true  # 无迁移文件时使用 SQLModel 元数据建表
 ```
 

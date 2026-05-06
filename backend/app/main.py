@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect
 from sqlmodel import SQLModel
 from starlette.middleware.cors import CORSMiddleware
 
@@ -42,6 +43,10 @@ def _run_migrations_sync() -> None:
     command.upgrade(_build_alembic_config(), "head")
 
 
+def _stamp_head_sync() -> None:
+    command.stamp(_build_alembic_config(), "head")
+
+
 def _has_alembic_revisions() -> bool:
     return len(ScriptDirectory.from_config(_build_alembic_config()).get_heads()) > 0
 
@@ -49,6 +54,30 @@ def _has_alembic_revisions() -> bool:
 async def _create_tables_from_metadata() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+
+
+async def _get_existing_table_names() -> set[str]:
+    async with engine.connect() as conn:
+        return await conn.run_sync(lambda sync_conn: set(inspect(sync_conn).get_table_names()))
+
+
+async def _bootstrap_empty_database_and_stamp_head() -> bool:
+    managed_tables = set(SQLModel.metadata.tables.keys())
+    if not managed_tables:
+        logger.warning("No SQLModel tables discovered; skipping metadata bootstrap.")
+        return False
+
+    existing_tables = await _get_existing_table_names()
+    if existing_tables & managed_tables:
+        return False
+
+    logger.warning(
+        "No managed tables found in target database; creating schema from metadata and stamping alembic head."
+    )
+    await _create_tables_from_metadata()
+    await asyncio.to_thread(_stamp_head_sync)
+    logger.info("Empty database bootstrap completed (metadata create_all + alembic stamp head).")
+    return True
 
 
 if settings.SENTRY_DSN and settings.ENVIRONMENT != "development":
@@ -67,10 +96,15 @@ app = FastAPI(
 async def startup_tasks() -> None:
     if settings.AUTO_MIGRATE_ON_STARTUP:
         if _has_alembic_revisions():
-            logger.info("Running alembic migrations on startup...")
-            # Alembic env uses asyncio.run; execute in thread to avoid active-loop conflict.
-            await asyncio.to_thread(_run_migrations_sync)
-            logger.info("Alembic migrations completed.")
+            bootstrapped = False
+            if settings.AUTO_BOOTSTRAP_EMPTY_DB_WITH_METADATA:
+                bootstrapped = await _bootstrap_empty_database_and_stamp_head()
+
+            if not bootstrapped:
+                logger.info("Running alembic migrations on startup...")
+                # Alembic env uses asyncio.run; execute in thread to avoid active-loop conflict.
+                await asyncio.to_thread(_run_migrations_sync)
+                logger.info("Alembic migrations completed.")
         elif settings.AUTO_CREATE_TABLES_IF_NO_MIGRATIONS:
             logger.warning(
                 "No alembic revision files found; creating tables from SQLModel metadata."
