@@ -1,5 +1,10 @@
 import api from '@/api'
 
+export interface RoleOptionPublic {
+  id: number
+  name: string
+}
+
 export interface UserPublic {
   id: string
   username: string
@@ -9,6 +14,7 @@ export interface UserPublic {
   is_active: boolean
   is_superuser: boolean
   created_at: string
+  roles: RoleOptionPublic[]
 }
 
 export interface UsersPublic {
@@ -34,8 +40,29 @@ export interface UserUpdate {
   avatar_url?: string
 }
 
+export interface UserListParams {
+  username?: string
+  email?: string
+  is_active?: boolean
+  role_ids?: number[]
+  skip?: number
+  limit?: number
+}
+
+export interface UserSearchPublic {
+  id: string
+  username: string
+  nickname: string
+  email: string | null
+  roles: RoleOptionPublic[]
+}
+
+export interface UserSearchResults {
+  data: UserSearchPublic[]
+}
+
 export const usersApi = {
-  list: (params?: { skip?: number; limit?: number }) =>
+  list: (params?: UserListParams) =>
     api.get<UsersPublic>('/users/', { params }),
 
   get: (id: string) => api.get<UserPublic>(`/users/${id}`),
@@ -49,6 +76,9 @@ export const usersApi = {
 
   assignRoles: (id: string, roleIds: number[]) =>
     api.put(`/users/${id}/roles`, { role_ids: roleIds }),
+
+  search: (params?: { keyword?: string; exclude_role_id?: number; limit?: number }) =>
+    api.get<UserSearchResults>('/users/search', { params }),
 
   getMe: () => api.get<UserPublic>('/users/me'),
 

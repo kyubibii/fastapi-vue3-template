@@ -18,6 +18,11 @@ class ItemUpdate(BaseModel):
     description: str | None = None
 
 
+class ItemListFilter(BaseModel):
+    owner_id: uuid.UUID | None = None
+    title: str | None = None
+
+
 class ItemPublic(ItemBase):
     id: uuid.UUID
     owner_id: uuid.UUID

@@ -10,6 +10,7 @@ from app.models.rbac import (
     RolePermission,
     UserRole,
 )
+from app.models.setting import Setting
 from app.models.user import User
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "UserRole",
     "AuditLog",
     "Item",
+    "Setting",
 ]

@@ -22,6 +22,21 @@
         </div>
       </template>
 
+      <el-form inline class="filter-form">
+        <el-form-item label="标题">
+          <el-input
+            v-model="filters.title"
+            placeholder="请输入物品标题"
+            clearable
+            @keyup.enter="handleSearch"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-button @click="resetFilters">重置</el-button>
+        </el-form-item>
+      </el-form>
+
       <el-table v-loading="loading" :data="items" stripe>
         <el-table-column prop="title" label="标题" />
         <el-table-column
@@ -34,7 +49,7 @@
           label="创建时间"
           :formatter="fmtDate"
         />
-        <el-table-column label="操作" width="160">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button
               v-if="permStore.hasPermission('content.items.update')"
@@ -69,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { reactive, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { itemsApi } from "@/api/items";
@@ -84,6 +99,7 @@ const items = ref<ItemPublic[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(20);
+const filters = reactive({ title: "" });
 
 function fmtDate(_row: unknown, _col: unknown, val: string) {
   return val ? new Date(val).toLocaleString("zh-CN") : "—";
@@ -93,7 +109,11 @@ async function fetchItems() {
   loading.value = true;
   try {
     const skip = (currentPage.value - 1) * pageSize.value;
-    const res = await itemsApi.list({ skip, limit: pageSize.value });
+    const res = await itemsApi.list({
+      skip,
+      limit: pageSize.value,
+      title: filters.title || undefined,
+    });
     items.value = res.data.data;
     total.value = res.data.count;
   } catch {
@@ -115,7 +135,7 @@ async function deleteItem(id: string) {
 
 async function exportCsv() {
   try {
-    const res = await itemsApi.exportCsv();
+    const res = await itemsApi.exportCsv({ title: filters.title || undefined });
     const url = URL.createObjectURL(res.data as Blob);
     const a = document.createElement("a");
     a.href = url;
@@ -127,6 +147,17 @@ async function exportCsv() {
   }
 }
 
+function handleSearch() {
+  currentPage.value = 1;
+  fetchItems();
+}
+
+function resetFilters() {
+  filters.title = "";
+  currentPage.value = 1;
+  fetchItems();
+}
+
 onMounted(fetchItems);
 </script>
 
@@ -135,6 +166,9 @@ onMounted(fetchItems);
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.filter-form {
+  margin-bottom: 16px;
 }
 .pagination {
   margin-top: 16px;

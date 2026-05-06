@@ -1,23 +1,25 @@
 import asyncio
 import logging
+from pathlib import Path
+
 import sentry_sdk
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 from sqlmodel import SQLModel
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
 from app.core.config import settings
 from app.core.db import engine
+from app.core.runtime_settings import bootstrap_settings_from_env
 from app.initial_data import seed
 from app.middleware.audit_log import AuditLogMiddleware
 from app.models import *  # noqa: F401, F403
-
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +84,14 @@ async def startup_tasks() -> None:
         await seed()
         logger.info("Initial data seed completed.")
 
+    inserted, skipped = await bootstrap_settings_from_env()
+    if inserted or skipped:
+        logger.info(
+            "Settings bootstrap completed: inserted=%s skipped=%s",
+            inserted,
+            skipped,
+        )
+
 
 @app.on_event("shutdown")
 async def shutdown_tasks() -> None:
@@ -111,4 +121,11 @@ _backend_static = Path(__file__).parent / "static"
 _frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 _static_dir = _backend_static if _backend_static.exists() else _frontend_dist
 if _static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="frontend")
+    app.mount("/assets", StaticFiles(directory=str(_static_dir / "assets")), name="frontend-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def frontend_app(full_path: str) -> FileResponse:
+        requested_path = _static_dir / full_path
+        if full_path and requested_path.is_file():
+            return FileResponse(requested_path)
+        return FileResponse(_static_dir / "index.html")

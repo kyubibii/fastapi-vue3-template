@@ -1,12 +1,12 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Text
 from sqlmodel import Field, SQLModel
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class AuditLog(SQLModel, table=True):
@@ -29,6 +29,7 @@ class AuditLog(SQLModel, table=True):
     # What was called
     http_method: str = Field(max_length=10)
     endpoint: str = Field(max_length=500)
+    module: str | None = Field(default=None, max_length=100, index=True)
     # Human-readable label extracted from route tags, e.g. "Create Item"
     operation: str | None = Field(default=None, max_length=200)
 
@@ -49,7 +50,5 @@ class AuditLog(SQLModel, table=True):
     tags: str | None = Field(default=None, max_length=200)
 
     created_at: datetime = Field(
-        default_factory=_utcnow,
-        sa_type=DateTime(timezone=True),  # type: ignore[call-arg]
-        index=True,
+        sa_column=Column(DateTime(timezone=True), default=_utcnow, index=True, nullable=False)
     )

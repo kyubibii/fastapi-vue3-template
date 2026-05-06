@@ -1,4 +1,5 @@
 import api from '@/api'
+import type { UserSearchResults } from '@/api/users'
 
 export interface RolePublic {
   id: number
@@ -55,6 +56,10 @@ export const rolesApi = {
   getPermissions: (id: number) => api.get<number[]>(`/roles/${id}/permissions`),
   assignPermissions: (id: number, permissionIds: number[]) =>
     api.put(`/roles/${id}/permissions`, { permission_ids: permissionIds }),
+  getUsers: (id: number, params?: { keyword?: string }) =>
+    api.get<UserSearchResults>(`/roles/${id}/users`, { params }),
+  assignUsers: (id: number, userIds: string[]) =>
+    api.put(`/roles/${id}/users`, { user_ids: userIds }),
 }
 
 export const permissionsApi = {

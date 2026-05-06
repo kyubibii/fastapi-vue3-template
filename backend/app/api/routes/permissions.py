@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from sqlmodel import select
 
 from app.api.deps import SessionDep, SuperuserDep
@@ -27,7 +27,12 @@ _BUILTIN_ACTIONS = [
 ]
 
 
-@router.get("/tree", response_model=PermissionTreeResponse)
+@router.get(
+    "/tree",
+    response_model=PermissionTreeResponse,
+    summary="获取权限树",
+    description="返回完整的权限组、页面与权限动作树。",
+)
 async def get_permission_tree(
     session: SessionDep,
     _: SuperuserDep,
@@ -67,7 +72,13 @@ async def get_permission_tree(
     return PermissionTreeResponse(groups=result)
 
 
-@router.post("/groups", response_model=PermissionGroupPublic, status_code=201)
+@router.post(
+    "/groups",
+    response_model=PermissionGroupPublic,
+    status_code=201,
+    summary="创建权限组",
+    description="创建新的权限组节点。",
+)
 async def create_group(
     session: SessionDep,
     body: PermissionGroupCreate,
@@ -91,7 +102,13 @@ async def create_group(
     )
 
 
-@router.post("/pages", response_model=PermissionPagePublic, status_code=201)
+@router.post(
+    "/pages",
+    response_model=PermissionPagePublic,
+    status_code=201,
+    summary="创建权限页面",
+    description="创建权限页面，并自动生成内置增删改查动作。",
+)
 async def create_page(
     session: SessionDep,
     body: PermissionPageCreate,
@@ -141,7 +158,13 @@ async def create_page(
     )
 
 
-@router.post("/pages/{page_id}/actions", response_model=PermissionPublic, status_code=201)
+@router.post(
+    "/pages/{page_id}/actions",
+    response_model=PermissionPublic,
+    status_code=201,
+    summary="新增自定义权限动作",
+    description="为指定权限页面新增一个自定义动作权限。",
+)
 async def add_custom_action(
     page_id: int,
     action_code: str,

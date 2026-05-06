@@ -1,24 +1,87 @@
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
-from app.api.deps import CurrentUser, SessionDep, SuperuserDep, permission_required
+from app.api.deps import CurrentUser, SessionDep, SuperuserDep
+from app.api.routes.base import CRUDRouterBase
 from app.crud import permissions as perm_crud
 from app.crud import users as users_crud
 from app.schemas.rbac import AssignUserRoles, NavigationResponse
-from app.schemas.user import UserCreate, UserPublic, UsersPublic, UserUpdate
+from app.schemas.user import (
+    UserCreate,
+    UserListFilter,
+    UserPublic,
+    UserSearchFilter,
+    UserSearchPublic,
+    UserSearchResults,
+    UsersPublic,
+    UserUpdate,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/me", response_model=UserPublic)
+def get_user_filters(
+    username: str | None = None,
+    email: str | None = None,
+    is_active: bool | None = None,
+    role_ids: list[int] | None = Query(default=None),
+) -> UserListFilter:
+    return UserListFilter(
+        username=username,
+        email=email,
+        is_active=is_active,
+        role_ids=role_ids or [],
+    )
+
+
+class UserCRUDRouter(
+    CRUDRouterBase[
+        UserCreate,
+        UserUpdate,
+        UserPublic,
+        UsersPublic,
+        UserListFilter,
+        uuid.UUID,
+    ]
+):
+    prefix = ""
+    tag = "users"
+    entity_name = "User"
+    entity_label = "用户"
+    id_type = uuid.UUID
+    create_schema = UserCreate
+    update_schema = UserUpdate
+    public_schema = UserPublic
+    list_schema = UsersPublic
+    service = users_crud.service
+    filter_dependency = get_user_filters
+    permissions = {
+        "read": "user_mgmt.users.read",
+        "export": "user_mgmt.users.export",
+        "create": "user_mgmt.users.create",
+        "update": "user_mgmt.users.update",
+        "delete": "user_mgmt.users.delete",
+    }
+
+
+@router.get(
+    "/me",
+    response_model=UserPublic,
+    summary="获取当前用户资料",
+    description="返回当前登录用户的基本资料信息。",
+)
 async def get_me(current_user: CurrentUser) -> UserPublic:
     """Return the authenticated user's profile."""
     return UserPublic.model_validate(current_user, from_attributes=True)
 
 
-@router.get("/me/navigation", response_model=NavigationResponse)
+@router.get(
+    "/me/navigation",
+    response_model=NavigationResponse,
+    summary="获取当前用户导航权限",
+    description="返回当前用户可见的菜单、页面和按钮权限树。",
+)
 async def get_my_navigation(
     current_user: CurrentUser,
     session: SessionDep,
@@ -38,98 +101,43 @@ async def get_my_navigation(
     return NavigationResponse(groups=groups)
 
 
-@router.get("/", response_model=UsersPublic)
-async def list_users(
+@router.get(
+    "/search",
+    response_model=UserSearchResults,
+    summary="搜索用户",
+    description="按关键字搜索用户，并可排除已分配指定角色的用户。",
+)
+async def search_users(
     session: SessionDep,
-    _: Annotated[None, Depends(permission_required("user_mgmt.users.read"))],
-    skip: int = 0,
-    limit: int = 100,
-) -> UsersPublic:
-    users, count = await users_crud.get_users(session=session, skip=skip, limit=limit)
-    return UsersPublic(
-        data=[UserPublic.model_validate(u, from_attributes=True) for u in users],
-        count=count,
+    _: SuperuserDep,
+    keyword: str | None = None,
+    exclude_role_id: int | None = None,
+    limit: int = 20,
+) -> UserSearchResults:
+    users = await users_crud.search_users(
+        session=session,
+        filters=UserSearchFilter(
+            keyword=keyword,
+            exclude_role_id=exclude_role_id,
+        ),
+        limit=limit,
+    )
+    return UserSearchResults(
+        data=[UserSearchPublic.model_validate(user, from_attributes=True) for user in users]
     )
 
-
-@router.post("/", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    session: SessionDep,
-    body: UserCreate,
-    current_user: Annotated[
-        None, Depends(permission_required("user_mgmt.users.create"))
-    ],
-) -> UserPublic:
-    existing = await users_crud.get_user_by_username(
-        session=session, username=body.username
-    )
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Username '{body.username}' already taken",
-        )
-    creator_id = current_user.id if hasattr(current_user, "id") else None  # type: ignore[union-attr]
-    user = await users_crud.create_user(
-        session=session, user_in=body, created_by=creator_id
-    )
-    return UserPublic.model_validate(user, from_attributes=True)
-
-
-@router.get("/{user_id}", response_model=UserPublic)
-async def get_user(
-    user_id: uuid.UUID,
-    session: SessionDep,
-    _: Annotated[None, Depends(permission_required("user_mgmt.users.read"))],
-) -> UserPublic:
-    user = await users_crud.get_user_by_id(session=session, user_id=user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return UserPublic.model_validate(user, from_attributes=True)
-
-
-@router.patch("/{user_id}", response_model=UserPublic)
-async def update_user(
-    user_id: uuid.UUID,
-    session: SessionDep,
-    body: UserUpdate,
-    current_user: Annotated[
-        None, Depends(permission_required("user_mgmt.users.update"))
-    ],
-) -> UserPublic:
-    user = await users_crud.get_user_by_id(session=session, user_id=user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    updater_id = current_user.id if hasattr(current_user, "id") else None  # type: ignore[union-attr]
-    updated = await users_crud.update_user(
-        session=session, db_user=user, user_in=body, updated_by=updater_id
-    )
-    return UserPublic.model_validate(updated, from_attributes=True)
-
-
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
-    user_id: uuid.UUID,
-    session: SessionDep,
-    current_user: Annotated[
-        None, Depends(permission_required("user_mgmt.users.delete"))
-    ],
-) -> None:
-    user = await users_crud.get_user_by_id(session=session, user_id=user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    deleter_id = current_user.id if hasattr(current_user, "id") else None  # type: ignore[union-attr]
-    await users_crud.soft_delete_user(
-        session=session, db_user=user, deleted_by=deleter_id
-    )
-
-
-@router.put("/{user_id}/roles", status_code=status.HTTP_200_OK)
+@router.put(
+    "/{user_id}/roles",
+    status_code=status.HTTP_200_OK,
+    summary="分配用户角色",
+    description="覆盖指定用户当前关联的全部角色。",
+)
 async def assign_user_roles(
     user_id: uuid.UUID,
     session: SessionDep,
     body: AssignUserRoles,
     _: SuperuserDep,
-) -> dict:
+) -> dict[str, str]:
     """Replace all roles assigned to a user. Superuser only."""
     user = await users_crud.get_user_by_id(session=session, user_id=user_id)
     if not user:
@@ -140,7 +148,12 @@ async def assign_user_roles(
     return {"message": "Roles updated"}
 
 
-@router.get("/{user_id}/roles", response_model=list[int])
+@router.get(
+    "/{user_id}/roles",
+    response_model=list[int],
+    summary="获取用户角色",
+    description="返回指定用户当前关联的角色 ID 列表。",
+)
 async def get_user_roles(
     user_id: uuid.UUID,
     session: SessionDep,
@@ -148,3 +161,6 @@ async def get_user_roles(
 ) -> list[int]:
     """Get role IDs assigned to a user. Superuser only."""
     return await perm_crud.get_user_role_ids(session=session, user_id=user_id)
+
+
+router.include_router(UserCRUDRouter().build_router())

@@ -13,6 +13,12 @@ export interface ItemsPublic {
   count: number
 }
 
+export interface ItemListParams {
+  title?: string
+  skip?: number
+  limit?: number
+}
+
 export interface ItemCreate {
   title: string
   description?: string
@@ -24,7 +30,7 @@ export interface ItemUpdate {
 }
 
 export const itemsApi = {
-  list: (params?: { skip?: number; limit?: number }) =>
+  list: (params?: ItemListParams) =>
     api.get<ItemsPublic>('/items/', { params }),
 
   get: (id: string) => api.get<ItemPublic>(`/items/${id}`),
@@ -36,6 +42,6 @@ export const itemsApi = {
 
   delete: (id: string) => api.delete(`/items/${id}`),
 
-  exportCsv: () =>
-    api.get('/items/export/csv', { responseType: 'blob' }),
+  exportCsv: (params?: Pick<ItemListParams, 'title'>) =>
+    api.get('/items/export/csv', { params, responseType: 'blob' }),
 }

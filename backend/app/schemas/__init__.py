@@ -16,6 +16,14 @@ from app.schemas.rbac import (
     RolesPublic,
     RoleUpdate,
 )
+from app.schemas.setting import (
+    SettingCreate,
+    SettingGroupPublic,
+    SettingGroupsPublic,
+    SettingPublic,
+    SettingsPublic,
+    SettingUpdate,
+)
 from app.schemas.user import (
     UserCreate,
     UserPublic,
@@ -46,6 +54,12 @@ __all__ = [
     "RolePublic",
     "RolesPublic",
     "RoleUpdate",
+    "SettingCreate",
+    "SettingGroupPublic",
+    "SettingGroupsPublic",
+    "SettingPublic",
+    "SettingsPublic",
+    "SettingUpdate",
     "UserCreate",
     "UserPublic",
     "UsersPublic",

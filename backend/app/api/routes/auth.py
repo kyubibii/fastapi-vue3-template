@@ -1,11 +1,10 @@
-from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any, cast
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Cookie, HTTPException, Response, status
 from sqlmodel import select
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import SessionDep
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -34,7 +33,12 @@ def _set_refresh_cookie(response: Response, raw_token: str) -> None:
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="用户登录",
+    description="使用用户名和密码登录，并返回访问令牌。",
+)
 async def login(
     body: LoginRequest,
     response: Response,
@@ -57,7 +61,7 @@ async def login(
     access_token = create_access_token(str(user.id))
 
     raw_refresh = create_refresh_token()
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    expires_at = datetime.now(UTC) + timedelta(
         days=settings.REFRESH_TOKEN_EXPIRE_DAYS
     )
     session.add(
@@ -73,7 +77,12 @@ async def login(
     return TokenResponse(access_token=access_token)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="刷新访问令牌",
+    description="使用刷新令牌换取新的访问令牌和刷新令牌。",
+)
 async def refresh_token(
     response: Response,
     session: SessionDep,
@@ -90,7 +99,7 @@ async def refresh_token(
     result = await session.execute(
         select(RefreshToken).where(
             RefreshToken.token_hash == token_hash,
-            RefreshToken.revoked_at.is_(None),
+            cast(Any, RefreshToken.revoked_at).is_(None),
         )
     )
     db_token = result.scalar_one_or_none()
@@ -101,12 +110,11 @@ async def refresh_token(
             detail="Invalid or revoked refresh token",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     token_expiry = db_token.expires_at
     # Make timezone-aware if DB returned naive datetime
     if token_expiry.tzinfo is None:
-        from datetime import timezone as tz
-        token_expiry = token_expiry.replace(tzinfo=tz.utc)
+        token_expiry = token_expiry.replace(tzinfo=UTC)
 
     if token_expiry < now:
         raise HTTPException(
@@ -135,12 +143,17 @@ async def refresh_token(
     return TokenResponse(access_token=new_access)
 
 
-@router.post("/logout", status_code=status.HTTP_200_OK)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    summary="用户登出",
+    description="撤销当前刷新令牌并清理登录 Cookie。",
+)
 async def logout(
     response: Response,
     session: SessionDep,
     refresh_token: Annotated[str | None, Cookie()] = None,
-) -> dict:
+) -> dict[str, str]:
     """Revoke the current refresh token and clear the cookie."""
     if refresh_token:
         token_hash = hash_token(refresh_token)
@@ -149,7 +162,7 @@ async def logout(
         )
         db_token = result.scalar_one_or_none()
         if db_token and not db_token.revoked_at:
-            db_token.revoked_at = datetime.now(timezone.utc)
+            db_token.revoked_at = datetime.now(UTC)
             session.add(db_token)
             await session.commit()
 

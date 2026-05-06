@@ -10,7 +10,10 @@ class AuditLogPublic(BaseModel):
     username: str | None
     http_method: str
     endpoint: str
+    module: str | None
     operation: str | None
+    request_body: str | None
+    response_body: str | None
     status_code: int | None
     duration_ms: int | None
     ip_address: str | None

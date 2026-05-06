@@ -2,6 +2,12 @@ import type { RouteRecordRaw } from 'vue-router'
 
 export const systemRoutes: RouteRecordRaw[] = [
   {
+    path: 'settings',
+    name: 'SettingManagement',
+    component: () => import('@/views/system/SettingManagementView.vue'),
+    meta: { permission: 'system.settings.read' },
+  },
+  {
     path: 'roles',
     name: 'RolePermission',
     component: () => import('@/views/system/RolePermissionView.vue'),

@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.schemas.rbac import RoleOptionPublic
+
 
 class UserBase(BaseModel):
     username: str = Field(min_length=2, max_length=50)
@@ -30,11 +32,38 @@ class UserUpdatePassword(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class UserListFilter(BaseModel):
+    username: str | None = None
+    email: str | None = None
+    is_active: bool | None = None
+    role_ids: list[int] = []
+
+
+class UserSearchFilter(BaseModel):
+    keyword: str | None = None
+    exclude_role_id: int | None = None
+
+
 class UserPublic(UserBase):
     id: uuid.UUID
     created_at: datetime
+    roles: list[RoleOptionPublic] = []
 
     model_config = {"from_attributes": True}
+
+
+class UserSearchPublic(BaseModel):
+    id: uuid.UUID
+    username: str
+    nickname: str | None
+    email: str | None
+    roles: list[RoleOptionPublic] = []
+
+    model_config = {"from_attributes": True}
+
+
+class UserSearchResults(BaseModel):
+    data: list[UserSearchPublic]
 
 
 class UsersPublic(BaseModel):

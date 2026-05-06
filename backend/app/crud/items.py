@@ -1,40 +1,37 @@
-import csv
-import io
 import uuid
-from datetime import datetime, timezone
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
+from app.crud.base import CRUDServiceBase
 from app.models.item import Item
-from app.schemas.item import ItemCreate, ItemUpdate
+from app.schemas.item import ItemCreate, ItemListFilter, ItemUpdate
 
 
-async def get_item_by_id(
-    *, session: AsyncSession, item_id: uuid.UUID
-) -> Item | None:
-    result = await session.execute(
-        select(Item).where(Item.id == item_id, Item.deleted_at.is_(None))
-    )
-    return result.scalar_one_or_none()
+class ItemCRUDService(
+    CRUDServiceBase[Item, ItemCreate, ItemUpdate, ItemListFilter, uuid.UUID]
+):
+    model = Item
+    list_order_by = cast(Any, Item.created_at).desc()
+    export_order_by = cast(Any, Item.created_at).asc()
+    export_fields = ["id", "title", "description", "owner_id", "created_at"]
+    export_filename = "items.csv"
+
+    def apply_filters(self, query: Any, filters: ItemListFilter | None) -> Any:
+        if not filters:
+            return query
+        if filters.owner_id:
+            query = query.where(Item.owner_id == filters.owner_id)
+        if filters.title:
+            query = query.where(cast(Any, Item.title).contains(filters.title))
+        return query
 
 
-async def get_items(
-    *,
-    session: AsyncSession,
-    owner_id: uuid.UUID | None = None,
-    skip: int = 0,
-    limit: int = 100,
-) -> tuple[list[Item], int]:
-    query = select(Item).where(Item.deleted_at.is_(None))
-    if owner_id:
-        query = query.where(Item.owner_id == owner_id)
-    count_result = await session.execute(query)
-    count = len(count_result.scalars().all())
-    result = await session.execute(
-        query.order_by(Item.created_at.desc()).offset(skip).limit(limit)
-    )
-    return list(result.scalars().all()), count
+service = ItemCRUDService()
+
+
+async def get_item_by_id(*, session: AsyncSession, item_id: uuid.UUID) -> Item | None:
+    return await service.get_by_id(session=session, obj_id=item_id)
 
 
 async def create_item(
@@ -44,16 +41,29 @@ async def create_item(
     owner_id: uuid.UUID,
     created_by: uuid.UUID | None = None,
 ) -> Item:
-    item = Item(
-        title=item_in.title,
-        description=item_in.description,
+    return await service.create(
+        session=session,
+        obj_in=item_in,
         owner_id=owner_id,
         created_by=created_by,
     )
-    session.add(item)
-    await session.commit()
-    await session.refresh(item)
-    return item
+
+
+async def get_items(
+    *,
+    session: AsyncSession,
+    owner_id: uuid.UUID | None = None,
+    title: str | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> tuple[list[Item], int]:
+    filters = ItemListFilter(owner_id=owner_id, title=title)
+    return await service.get_multi(
+        session=session,
+        filters=filters,
+        skip=skip,
+        limit=limit,
+    )
 
 
 async def update_item(
@@ -63,15 +73,12 @@ async def update_item(
     item_in: ItemUpdate,
     updated_by: uuid.UUID | None = None,
 ) -> Item:
-    update_data = item_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_item, key, value)
-    db_item.updated_at = datetime.now(timezone.utc)
-    db_item.updated_by = updated_by
-    session.add(db_item)
-    await session.commit()
-    await session.refresh(db_item)
-    return db_item
+    return await service.update(
+        session=session,
+        db_obj=db_item,
+        obj_in=item_in,
+        updated_by=updated_by,
+    )
 
 
 async def soft_delete_item(
@@ -80,40 +87,25 @@ async def soft_delete_item(
     db_item: Item,
     deleted_by: uuid.UUID | None = None,
 ) -> Item:
-    db_item.deleted_at = datetime.now(timezone.utc)
-    db_item.deleted_by = deleted_by
-    session.add(db_item)
-    await session.commit()
-    return db_item
+    deleted = await service.delete(
+        session=session,
+        db_obj=db_item,
+        deleted_by=deleted_by,
+    )
+    if deleted is None:
+        raise RuntimeError("Item service unexpectedly performed a hard delete")
+    return deleted
 
 
 async def get_all_items_for_export(
-    *, session: AsyncSession, owner_id: uuid.UUID | None = None
+    *,
+    session: AsyncSession,
+    owner_id: uuid.UUID | None = None,
+    title: str | None = None,
 ) -> list[Item]:
-    """Fetch all (non-deleted) items without pagination for CSV export."""
-    query = select(Item).where(Item.deleted_at.is_(None))
-    if owner_id:
-        query = query.where(Item.owner_id == owner_id)
-    result = await session.execute(query.order_by(Item.created_at.asc()))
-    return list(result.scalars().all())
+    filters = ItemListFilter(owner_id=owner_id, title=title)
+    return await service.get_all_for_export(session=session, filters=filters)
 
 
 def items_to_csv(items: list[Item]) -> str:
-    """Serialize items to a UTF-8 CSV string."""
-    output = io.StringIO()
-    writer = csv.DictWriter(
-        output,
-        fieldnames=["id", "title", "description", "owner_id", "created_at"],
-    )
-    writer.writeheader()
-    for item in items:
-        writer.writerow(
-            {
-                "id": str(item.id),
-                "title": item.title,
-                "description": item.description or "",
-                "owner_id": str(item.owner_id),
-                "created_at": item.created_at.isoformat() if item.created_at else "",
-            }
-        )
-    return output.getvalue()
+    return service.export_to_csv(items)

@@ -2,8 +2,11 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any, cast
 
+from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -32,11 +35,27 @@ _SENSITIVE_KEYS = frozenset(
         "card_number",
         "cvv",
         "authorization",
+        "setting_value",
     }
 )
 
 # Max body size stored in DB (10 KB)
 _MAX_BODY_BYTES = 10_240
+
+
+def _extract_module(path: str) -> str | None:
+    api_prefix = f"{settings.API_V1_STR}/"
+    if not path.startswith(api_prefix):
+        return None
+    module = path[len(api_prefix):].split("/", 1)[0].strip()
+    return module or None
+
+
+def _extract_operation(request: Request) -> str | None:
+    route = request.scope.get("route")
+    if not isinstance(route, APIRoute):
+        return None
+    return route.summary or None
 
 
 def _sanitize(obj: object) -> object:
@@ -77,7 +96,11 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
     settings.LOG_TO_FILE is True.
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         # Skip read-only and infrastructure endpoints
         if request.method == "GET" or any(
             request.url.path.startswith(p) for p in _SKIP_PREFIXES
@@ -103,10 +126,11 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
 
         # Forward to actual handler
         response = await call_next(request)
+        body_iterator = cast(Any, getattr(response, "body_iterator"))
 
         # Capture response body
         resp_chunks: list[bytes] = []
-        async for chunk in response.body_iterator:  # type: ignore[attr-defined]
+        async for chunk in body_iterator:
             resp_chunks.append(chunk)
         resp_body = b"".join(resp_chunks)
 
@@ -125,6 +149,8 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             username=username,
             http_method=request.method,
             endpoint=str(request.url.path),
+            module=_extract_module(str(request.url.path)),
+            operation=_extract_operation(request),
             request_body=_sanitize_body(req_body),
             response_body=_sanitize_body(resp_body),
             status_code=response.status_code,

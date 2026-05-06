@@ -1,5 +1,6 @@
 import uuid
 from fnmatch import fnmatch
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -8,7 +9,6 @@ from app.models.rbac import (
     Permission,
     PermissionGroup,
     PermissionPage,
-    Role,
     RolePermission,
     UserRole,
 )
@@ -18,13 +18,12 @@ from app.schemas.rbac import (
     NavigationPermission,
 )
 
-
 # ── Permission tree queries ────────────────────────────────────────────────────
 
 
 async def get_all_groups(*, session: AsyncSession) -> list[PermissionGroup]:
     result = await session.execute(
-        select(PermissionGroup).order_by(PermissionGroup.sort_order)
+        select(PermissionGroup).order_by(cast(Any, PermissionGroup.sort_order))
     )
     return list(result.scalars().all())
 
@@ -34,8 +33,8 @@ async def get_pages_by_group(
 ) -> list[PermissionPage]:
     result = await session.execute(
         select(PermissionPage)
-        .where(PermissionPage.group_id == group_id, PermissionPage.is_active.is_(True))
-        .order_by(PermissionPage.sort_order)
+        .where(PermissionPage.group_id == group_id, cast(Any, PermissionPage.is_active).is_(True))
+        .order_by(cast(Any, PermissionPage.sort_order))
     )
     return list(result.scalars().all())
 
@@ -74,7 +73,7 @@ async def get_user_permission_codes(
 
     perm_result = await session.execute(
         select(RolePermission.permission_id).where(
-            RolePermission.role_id.in_(role_ids)
+            cast(Any, RolePermission.role_id).in_(role_ids)
         )
     )
     perm_ids = list(perm_result.scalars().all())
@@ -82,7 +81,7 @@ async def get_user_permission_codes(
         return []
 
     code_result = await session.execute(
-        select(Permission.full_code).where(Permission.id.in_(perm_ids))
+        select(Permission.full_code).where(cast(Any, Permission.id).in_(perm_ids))
     )
     return list(code_result.scalars().all())
 
@@ -106,6 +105,26 @@ async def assign_user_roles(
     for ur in existing.scalars().all():
         await session.delete(ur)
     for role_id in role_ids:
+        session.add(UserRole(user_id=user_id, role_id=role_id))
+    await session.commit()
+
+
+async def get_role_user_ids(*, session: AsyncSession, role_id: int) -> list[uuid.UUID]:
+    result = await session.execute(
+        select(UserRole.user_id).where(UserRole.role_id == role_id)
+    )
+    return list(result.scalars().all())
+
+
+async def replace_role_users(
+    *, session: AsyncSession, role_id: int, user_ids: list[uuid.UUID]
+) -> None:
+    existing = await session.execute(
+        select(UserRole).where(UserRole.role_id == role_id)
+    )
+    for user_role in existing.scalars().all():
+        await session.delete(user_role)
+    for user_id in user_ids:
         session.add(UserRole(user_id=user_id, role_id=role_id))
     await session.commit()
 

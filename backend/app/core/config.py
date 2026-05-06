@@ -1,4 +1,5 @@
 import secrets
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from pydantic import AnyUrl, BeforeValidator, HttpUrl, computed_field
@@ -15,8 +16,10 @@ def parse_cors(v: Any) -> list[str] | str:
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        # Reads ../.env relative to the backend/ directory
-        env_file="../.env",
+        env_file=(
+            str(Path(__file__).resolve().parents[3] / ".env"),
+            str(Path(__file__).resolve().parents[2] / ".env"),
+        ),
         env_ignore_empty=True,
         extra="ignore",
     )
@@ -78,5 +81,62 @@ class Settings(BaseSettings):
     LOG_TO_FILE: bool = False
     LOG_FILE_PATH: str = "/var/log/app/audit.jsonl"
 
+    # ── Runtime settings ──────────────────────────────────────────────────────
+    SETTINGS_BOOTSTRAP_ENABLED: bool = True
+    SETTINGS_BOOTSTRAP_ITEMS: list[dict[str, Any]] = [
+        {
+            "setting_name": "site_title",
+            "setting_value": "Enterprise FastAPI Template",
+            "setting_group": "display",
+            "value_type": "string",
+            "description": "后台系统标题",
+        },
+        {
+            "setting_name": "dashboard_notice",
+            "setting_value": "欢迎使用企业管理后台",
+            "setting_group": "display",
+            "value_type": "string",
+            "description": "首页公告文案",
+        },
+        {
+            "setting_name": "feature_user_register_enabled",
+            "setting_value": "false",
+            "setting_group": "feature",
+            "value_type": "bool",
+            "description": "是否允许用户自助注册",
+        },
+        {
+            "setting_name": "smtp_host",
+            "setting_value": "",
+            "setting_group": "email",
+            "value_type": "string",
+            "description": "SMTP 主机地址",
+        },
+        {
+            "setting_name": "smtp_port",
+            "setting_value": "1025",
+            "setting_group": "email",
+            "value_type": "int",
+            "description": "SMTP 端口",
+        },
+        {
+            "setting_name": "smtp_password",
+            "setting_value": "",
+            "setting_group": "email",
+            "value_type": "string",
+            "description": "SMTP 密码",
+            "is_sensitive": True,
+            "is_encrypted": True,
+        },
+        {
+            "setting_name": "access_token_expire_minutes",
+            "setting_value": "15",
+            "setting_group": "security",
+            "value_type": "int",
+            "description": "访问令牌过期分钟数",
+        },
+    ]
+    RUNTIME_SETTINGS_CACHE_TTL_SECONDS: int = 60
 
-settings = Settings()  # type: ignore[call-arg]
+
+settings = Settings()

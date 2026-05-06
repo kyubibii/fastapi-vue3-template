@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 
-
 # ── Permission Tree ────────────────────────────────────────────────────────────
 
 
@@ -84,6 +83,13 @@ class RolesPublic(BaseModel):
     count: int
 
 
+class RoleOptionPublic(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 class AssignRolePermissions(BaseModel):
     """Replaces all current permissions on a role."""
     permission_ids: list[int]
@@ -92,6 +98,11 @@ class AssignRolePermissions(BaseModel):
 class AssignUserRoles(BaseModel):
     """Replaces all current roles for a user."""
     role_ids: list[int]
+
+
+class AssignRoleUsers(BaseModel):
+    """Replaces all current users assigned to a role."""
+    user_ids: list[str]
 
 
 # ── Navigation (user-specific view of permission tree) ─────────────────────────

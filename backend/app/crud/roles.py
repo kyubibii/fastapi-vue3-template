@@ -1,8 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.crud.users import search_users
 from app.models.rbac import Role, RolePermission
 from app.schemas.rbac import RoleCreate, RoleUpdate
+from app.schemas.user import UserSearchFilter
 
 
 async def get_roles(
@@ -79,3 +81,18 @@ async def get_role_permission_ids(
         select(RolePermission.permission_id).where(RolePermission.role_id == role_id)
     )
     return list(result.scalars().all())
+
+
+async def get_role_users(
+    *, session: AsyncSession, role_id: int, keyword: str | None = None
+) -> list[object]:
+    users = await search_users(
+        session=session,
+        filters=UserSearchFilter(keyword=keyword),
+        limit=200,
+    )
+    return [
+        user
+        for user in users
+        if any(role.id == role_id for role in getattr(user, "roles", []))
+    ]
