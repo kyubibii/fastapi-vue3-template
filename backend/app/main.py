@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.db import engine
 from app.core.runtime_settings import bootstrap_settings_from_env
 from app.initial_data import seed
+from app.jobs.scheduler import scheduler, setup_jobs
 from app.middleware.audit_log import AuditLogMiddleware
 from app.models import *  # noqa: F401, F403
 
@@ -92,9 +93,16 @@ async def startup_tasks() -> None:
             skipped,
         )
 
+    setup_jobs()
+    scheduler.start()
+    logger.info("APScheduler started with %d jobs.", len(scheduler.get_jobs()))
+
 
 @app.on_event("shutdown")
 async def shutdown_tasks() -> None:
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("APScheduler shut down.")
     await engine.dispose()
 
 # ── CORS ───────────────────────────────────────────────────────────────────────

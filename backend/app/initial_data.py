@@ -56,6 +56,7 @@ _PERM_TREE = [
             ("操作日志", "audit_logs", "/audit-logs", 10, []),
             ("角色权限", "roles", "/roles", 20, []),
             ("配置项管理", "settings", "/settings", 30, []),
+            ("定时任务", "jobs", "/jobs", 40, ["trigger", "manage"]),
         ],
     ),
 ]

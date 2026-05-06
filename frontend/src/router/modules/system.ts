@@ -19,4 +19,10 @@ export const systemRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/system/AuditLogListView.vue'),
     meta: { permission: 'system.audit_logs.read' },
   },
+  {
+    path: 'jobs',
+    name: 'JobManagement',
+    component: () => import('@/views/system/JobManagementView.vue'),
+    meta: { permission: 'system.jobs.read' },
+  },
 ]
