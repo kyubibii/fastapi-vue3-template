@@ -228,7 +228,115 @@ from app.api.routes.comments import router as comments_router
 api_router.include_router(comments_router)
 ```
 
-### 5️⃣ 生成数据库迁移
+### 5️⃣ 将新功能接入权限树（关键步骤）
+
+新功能不仅要有 API 和页面，还需要进入 RBAC 权限树，否则前端菜单和权限控制无法完整生效。
+
+当前项目的权限树是三层结构：
+
+```text
+PermissionGroup -> PermissionPage -> Permission
+```
+
+例如评论功能可设计为：
+
+```text
+content.comments.read
+content.comments.create
+content.comments.update
+content.comments.delete
+content.comments.export
+```
+
+#### 方式 A：通过权限管理 API 动态新增（推荐日常开发）
+
+1. 新增权限页面（会自动生成 read/create/update/delete 四个内置动作）
+
+```bash
+# 先获取 content 组的 group_id（可通过 GET /api/v1/permissions/tree 查看）
+curl -X POST "http://localhost:8000/api/v1/permissions/pages" \
+    -H "Authorization: Bearer <access_token>" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "group_id": 1,
+        "name": "评论管理",
+        "code": "comments",
+        "page_url": "/comments",
+        "sort_order": 20
+    }'
+```
+
+2. 按需新增自定义动作（如 export / approve）
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/permissions/pages/{page_id}/actions?action_code=export&action_name=导出评论" \
+    -H "Authorization: Bearer <access_token>"
+```
+
+3. 将新权限分配给角色
+
+```bash
+# 先通过 GET /api/v1/permissions/tree 拿到 permission_ids
+curl -X PUT "http://localhost:8000/api/v1/roles/{role_id}/permissions" \
+    -H "Authorization: Bearer <access_token>" \
+    -H "Content-Type: application/json" \
+    -d '{"permission_ids": [101, 102, 103, 104, 105]}'
+```
+
+4. 前端登录后重新拉取权限，验证菜单和按钮权限是否生效。
+
+#### 方式 B：在初始化种子中固化（推荐内置模块）
+
+如果评论是模板内置能力，建议把它写入 `backend/app/initial_data.py` 的 `_PERM_TREE`，这样新环境启动时自动具备该权限树。
+
+示例（在 `内容管理` 下新增 `评论管理` 页面）：
+
+```python
+_PERM_TREE = [
+        (
+                "内容管理", "content", 10,
+                [
+                        ("物品管理", "items", "/items", 10, ["export"]),
+                        ("评论管理", "comments", "/comments", 20, ["export"]),
+                ],
+        ),
+        # ...
+]
+```
+
+更新后执行初始化（或重启触发自动 seed）：
+
+```bash
+cd backend
+python -m app.initial_data
+```
+
+#### 在路由中落地权限校验
+
+为评论接口加上权限依赖（示例）：
+
+```python
+from app.api.deps import require_permission
+
+@router.post("", response_model=CommentResponse, status_code=201)
+async def create_comment(
+        comment_in: CommentCreate,
+        _: User = Depends(require_permission("content.comments.create")),
+        session: Session = Depends(get_session),
+        current_user: User = Depends(get_current_user),
+) -> CommentResponse:
+        ...
+```
+
+建议映射关系：
+
+- 列表/详情查询 -> `content.comments.read`
+- 新增评论 -> `content.comments.create`
+- 编辑评论 -> `content.comments.update`
+- 删除评论 -> `content.comments.delete`
+- 导出评论 -> `content.comments.export`
+
+### 6️⃣ 生成数据库迁移
 
 ```bash
 cd backend
@@ -243,7 +351,7 @@ cat app/alembic/versions/<timestamp>_add_comment_table.py
 alembic upgrade head
 ```
 
-### 6️⃣ 前端实现（可选）
+### 7️⃣ 前端实现（可选）
 
 `frontend/src/api/comments.ts`：
 
