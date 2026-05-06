@@ -48,15 +48,6 @@ async def get_permissions_by_page(
     return list(result.scalars().all())
 
 
-async def get_permission_by_full_code(
-    *, session: AsyncSession, full_code: str
-) -> Permission | None:
-    result = await session.execute(
-        select(Permission).where(Permission.full_code == full_code)
-    )
-    return result.scalar_one_or_none()
-
-
 # ── User permission resolution ─────────────────────────────────────────────────
 
 

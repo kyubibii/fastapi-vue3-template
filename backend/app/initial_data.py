@@ -9,10 +9,11 @@ Seed the database with:
 import asyncio
 import logging
 
-from sqlmodel import select
+from sqlmodel import delete, select
 
 from app.core.config import settings
 from app.core.db import async_session_maker
+from app.core.permission_tree import BUILTIN_ACTIONS, PERMISSION_TREE
 from app.core.security import get_password_hash
 from app.models.rbac import (
     Permission,
@@ -26,47 +27,6 @@ from app.models.user import User
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# ── Permission tree definition ─────────────────────────────────────────────────
-#
-# Format:
-#   (group_name, group_code, sort_order, [
-#       (page_name, page_code, page_url, sort_order, [extra_action_codes]),
-#       ...
-#   ])
-#
-# Each page automatically gets 4 builtin actions: read/create/update/delete.
-# Extra actions (e.g. "export") are appended as non-builtin.
-_PERM_TREE = [
-    (
-        "内容管理", "content", 10,
-        [
-            ("物品管理", "items", "/items", 10, ["export"]),
-        ],
-    ),
-    (
-        "用户管理", "user_mgmt", 20,
-        [
-            ("用户列表", "users", "/users", 10, []),
-        ],
-    ),
-    (
-        "系统管理", "system", 30,
-        [
-            ("操作日志", "audit_logs", "/audit-logs", 10, []),
-            ("角色权限", "roles", "/roles", 20, []),
-            ("配置项管理", "settings", "/settings", 30, []),
-            ("定时任务", "jobs", "/jobs", 40, ["trigger", "manage"]),
-        ],
-    ),
-]
-
-_BUILTIN_ACTIONS: list[tuple[str, str, bool]] = [
-    ("读取", "read", True),
-    ("创建", "create", True),
-    ("更新", "update", True),
-    ("删除", "delete", True),
-]
 
 
 async def seed() -> None:
@@ -95,10 +55,10 @@ async def seed() -> None:
             logger.info("Superuser '%s' created.", settings.FIRST_SUPERUSER)
 
         # ── 2. Permission tree ─────────────────────────────────────────────────
-        all_permission_ids: list[int] = []
+        target_permission_codes: set[str] = set()
 
-        for group_name, group_code, group_sort, pages in _PERM_TREE:
-            # Upsert group
+        for group_name, group_code, group_sort, pages in PERMISSION_TREE:
+            # Upsert group by code
             group = (
                 await session.execute(
                     select(PermissionGroup).where(PermissionGroup.code == group_code)
@@ -113,14 +73,24 @@ async def seed() -> None:
                 await session.commit()
                 await session.refresh(group)
                 logger.info("Created permission group: %s", group_code)
+            else:
+                should_update_group = (
+                    group.name != group_name or group.sort_order != group_sort
+                )
+                if should_update_group:
+                    group.name = group_name
+                    group.sort_order = group_sort
+                    session.add(group)
+                    await session.commit()
+                    await session.refresh(group)
+                    logger.info("Updated permission group metadata: %s", group_code)
 
             for page_name, page_code, page_url, page_sort, extra_actions in pages:
-                # Upsert page
+                # Upsert page by code
                 page = (
                     await session.execute(
                         select(PermissionPage).where(
-                            PermissionPage.code == page_code,
-                            PermissionPage.group_id == group.id,
+                            PermissionPage.code == page_code
                         )
                     )
                 ).scalar_one_or_none()
@@ -137,21 +107,29 @@ async def seed() -> None:
                     await session.commit()
                     await session.refresh(page)
                     logger.info("Created permission page: %s.%s", group_code, page_code)
-                elif page.page_url != page_url:
-                    page.page_url = page_url
-                    session.add(page)
-                    await session.commit()
-                    await session.refresh(page)
-                    logger.info(
-                        "Updated page_url for permission page: %s.%s -> %s",
-                        group_code,
-                        page_code,
-                        page_url,
+                else:
+                    should_update_page = (
+                        page.group_id != group.id
+                        or page.name != page_name
+                        or page.page_url != page_url
+                        or page.sort_order != page_sort
+                        or page.is_active is False
                     )
+                    if should_update_page:
+                        page.group_id = group.id  # type: ignore[assignment]
+                        page.name = page_name
+                        page.page_url = page_url
+                        page.sort_order = page_sort
+                        page.is_active = True
+                        session.add(page)
+                        await session.commit()
+                        await session.refresh(page)
+                        logger.info("Updated permission page metadata: %s.%s", group_code, page_code)
 
                 # Builtin CRUD actions
-                for action_name, action_code, is_builtin in _BUILTIN_ACTIONS:
+                for action_name, action_code, is_builtin in BUILTIN_ACTIONS:
                     full_code = f"{group_code}.{page_code}.{action_code}"
+                    target_permission_codes.add(full_code)
                     perm = (
                         await session.execute(
                             select(Permission).where(Permission.full_code == full_code)
@@ -169,12 +147,26 @@ async def seed() -> None:
                         session.add(perm)
                         await session.commit()
                         await session.refresh(perm)
-
-                    all_permission_ids.append(perm.id)  # type: ignore[arg-type]
+                    else:
+                        should_update_perm = (
+                            perm.page_id != page.id
+                            or perm.name != f"{action_name}{page_name}"
+                            or perm.code != action_code
+                            or perm.is_builtin is not is_builtin
+                        )
+                        if should_update_perm:
+                            perm.page_id = page.id  # type: ignore[assignment]
+                            perm.name = f"{action_name}{page_name}"
+                            perm.code = action_code
+                            perm.is_builtin = is_builtin
+                            session.add(perm)
+                            await session.commit()
+                            await session.refresh(perm)
 
                 # Extra non-builtin actions
                 for extra_code in extra_actions:
                     full_code = f"{group_code}.{page_code}.{extra_code}"
+                    target_permission_codes.add(full_code)
                     perm = (
                         await session.execute(
                             select(Permission).where(Permission.full_code == full_code)
@@ -192,10 +184,41 @@ async def seed() -> None:
                         session.add(perm)
                         await session.commit()
                         await session.refresh(perm)
+                    else:
+                        should_update_perm = (
+                            perm.page_id != page.id
+                            or perm.name != f"{extra_code}{page_name}"
+                            or perm.code != extra_code
+                            or perm.is_builtin is not False
+                        )
+                        if should_update_perm:
+                            perm.page_id = page.id  # type: ignore[assignment]
+                            perm.name = f"{extra_code}{page_name}"
+                            perm.code = extra_code
+                            perm.is_builtin = False
+                            session.add(perm)
+                            await session.commit()
+                            await session.refresh(perm)
 
-                    all_permission_ids.append(perm.id)  # type: ignore[arg-type]
+        db_perms = (await session.execute(select(Permission))).scalars().all()
+        stale_permission_ids = [
+            p.id for p in db_perms if p.full_code not in target_permission_codes and p.id is not None
+        ]
 
-        logger.info("Permission tree seeded (%d permissions).", len(all_permission_ids))
+        if stale_permission_ids:
+            await session.execute(
+                delete(RolePermission).where(RolePermission.permission_id.in_(stale_permission_ids))
+            )
+            await session.execute(
+                delete(Permission).where(Permission.id.in_(stale_permission_ids))
+            )
+            await session.commit()
+            logger.info("Deleted stale permissions: %d", len(stale_permission_ids))
+
+        current_permission_ids = list(
+            (await session.execute(select(Permission.id))).scalars().all()
+        )
+        logger.info("Permission tree synced (%d permissions).", len(current_permission_ids))
 
         # ── 3. Admin role ──────────────────────────────────────────────────────
         admin_role = (
@@ -209,20 +232,12 @@ async def seed() -> None:
             await session.refresh(admin_role)
             logger.info("Admin role created.")
 
-        # Assign all permissions to admin role (idempotent)
-        for perm_id in all_permission_ids:
-            exists = (
-                await session.execute(
-                    select(RolePermission).where(
-                        RolePermission.role_id == admin_role.id,
-                        RolePermission.permission_id == perm_id,
-                    )
-                )
-            ).scalar_one_or_none()
-            if not exists:
-                session.add(
-                    RolePermission(role_id=admin_role.id, permission_id=perm_id)
-                )
+        # Replace admin role permissions with current full permission set.
+        await session.execute(
+            delete(RolePermission).where(RolePermission.role_id == admin_role.id)
+        )
+        for perm_id in current_permission_ids:
+            session.add(RolePermission(role_id=admin_role.id, permission_id=perm_id))
 
         await session.commit()
         logger.info("All permissions assigned to admin role.")
