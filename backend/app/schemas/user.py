@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.constants import GenderEnum
 from app.schemas.rbac import RoleOptionPublic
 
 
@@ -13,6 +14,7 @@ class UserBase(BaseModel):
     email: str | None = None
     is_active: bool = True
     is_superuser: bool = False
+    gender: GenderEnum | None = None
 
 
 class UserCreate(UserBase):
@@ -25,6 +27,7 @@ class UserUpdate(BaseModel):
     email: str | None = None
     is_active: bool | None = None
     is_superuser: bool | None = None
+    gender: GenderEnum | None = None
 
 
 class UserUpdatePassword(BaseModel):
@@ -37,6 +40,7 @@ class UserListFilter(BaseModel):
     email: str | None = None
     is_active: bool | None = None
     role_ids: list[int] = []
+    gender: GenderEnum | None = None
 
 
 class UserSearchFilter(BaseModel):

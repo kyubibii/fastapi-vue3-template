@@ -24,6 +24,16 @@
         <el-form-item label="邮箱">
           <el-input v-model="form.email" />
         </el-form-item>
+        <el-form-item label="性别">
+          <el-select v-model="form.gender" placeholder="请选择性别" clearable>
+            <el-option
+              v-for="opt in GENDER_OPTIONS"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item
           :label="isEdit ? '新密码' : '密码'"
           :prop="isEdit ? '' : 'password'"
@@ -62,6 +72,7 @@ import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { usersApi } from "@/api/users";
+import { GENDER_OPTIONS, type GenderValue } from "@/constants";
 
 const route = useRoute();
 const router = useRouter();
@@ -73,6 +84,7 @@ const form = reactive({
   username: "",
   nickname: "",
   email: "",
+  gender: null as GenderValue | null,
   password: "",
   is_active: true,
   is_superuser: false,
@@ -95,6 +107,7 @@ async function handleSubmit() {
       const payload: Record<string, unknown> = {
         nickname: form.nickname,
         email: form.email || undefined,
+        gender: form.gender,
         is_active: form.is_active,
         is_superuser: form.is_superuser,
       };
@@ -107,6 +120,7 @@ async function handleSubmit() {
         nickname: form.nickname,
         password: form.password,
         email: form.email || undefined,
+        gender: form.gender,
         is_active: form.is_active,
         is_superuser: form.is_superuser,
       });
@@ -128,6 +142,7 @@ onMounted(async () => {
         username: res.data.username,
         nickname: res.data.nickname,
         email: res.data.email ?? "",
+        gender: res.data.gender ?? null,
         is_active: res.data.is_active,
         is_superuser: res.data.is_superuser,
       });

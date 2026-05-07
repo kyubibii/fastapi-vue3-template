@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUser, SessionDep, SuperuserDep
 from app.api.routes.base import CRUDRouterBase
+from app.constants import GenderEnum
 from app.crud import permissions as perm_crud
 from app.crud import users as users_crud
 from app.schemas.rbac import AssignUserRoles, NavigationResponse
@@ -25,12 +26,14 @@ def get_user_filters(
     username: str | None = None,
     email: str | None = None,
     is_active: bool | None = None,
+    gender: GenderEnum | None = None,
     role_ids: list[int] | None = Query(default=None),
 ) -> UserListFilter:
     return UserListFilter(
         username=username,
         email=email,
         is_active=is_active,
+        gender=gender,
         role_ids=role_ids or [],
     )
 

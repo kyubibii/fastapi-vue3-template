@@ -37,6 +37,21 @@
             <el-option label="禁用" value="false" />
           </el-select>
         </el-form-item>
+        <el-form-item label="性别">
+          <el-select
+            v-model="filters.gender"
+            placeholder="全部"
+            clearable
+            style="width: 120px"
+          >
+            <el-option
+              v-for="opt in GENDER_OPTIONS"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="角色">
           <el-select
             v-model="filters.role_ids"
@@ -65,6 +80,12 @@
       <el-table v-loading="loading" :data="users" stripe>
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
+        <el-table-column label="性别" width="90" align="center">
+          <template #default="{ row }">
+            <span v-if="row.gender">{{ genderLabel(row.gender) }}</span>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="email" label="邮箱" />
         <el-table-column label="状态">
           <template #default="{ row }">
@@ -135,6 +156,7 @@ import { usersApi } from "@/api/users";
 import type { UserPublic } from "@/api/users";
 import { rolesApi } from "@/api/rbac";
 import type { RolePublic } from "@/api/rbac";
+import { GENDER_OPTIONS, GENDER_LABELS, type GenderValue } from "@/constants";
 import { usePermissionStore } from "@/stores/permission";
 
 const router = useRouter();
@@ -151,10 +173,15 @@ const filters = reactive({
   email: "",
   is_active: "" as "" | "true" | "false",
   role_ids: [] as number[],
+  gender: "" as "" | GenderValue,
 });
 
 function fmtDate(_row: unknown, _col: unknown, val: string) {
   return val ? new Date(val).toLocaleString("zh-CN") : "—";
+}
+
+function genderLabel(gender: GenderValue) {
+  return GENDER_LABELS[gender];
 }
 
 async function fetchUsers() {
@@ -169,6 +196,7 @@ async function fetchUsers() {
       is_active:
         filters.is_active === "" ? undefined : filters.is_active === "true",
       role_ids: filters.role_ids.length ? filters.role_ids : undefined,
+      gender: filters.gender || undefined,
     });
     users.value = res.data.data;
     total.value = res.data.count;
@@ -208,6 +236,7 @@ function resetFilters() {
   filters.email = "";
   filters.is_active = "";
   filters.role_ids = [];
+  filters.gender = "";
   currentPage.value = 1;
   fetchUsers();
 }

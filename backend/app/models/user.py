@@ -2,6 +2,7 @@ import uuid
 
 from sqlmodel import Field
 
+from app.constants import GenderEnum
 from app.models.base import AuditBase
 
 
@@ -23,3 +24,4 @@ class User(AuditBase, table=True):
     hashed_password: str
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
+    gender: GenderEnum | None = Field(default=None)

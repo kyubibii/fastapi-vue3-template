@@ -1,4 +1,5 @@
 import api from '@/api'
+import type { GenderValue } from '@/constants'
 
 export interface RoleOptionPublic {
   id: number
@@ -13,6 +14,7 @@ export interface UserPublic {
   email: string | null
   is_active: boolean
   is_superuser: boolean
+  gender: GenderValue | null
   created_at: string
   roles: RoleOptionPublic[]
 }
@@ -29,6 +31,7 @@ export interface UserCreate {
   email?: string
   is_active?: boolean
   is_superuser?: boolean
+  gender?: GenderValue | null
 }
 
 export interface UserUpdate {
@@ -38,6 +41,7 @@ export interface UserUpdate {
   is_active?: boolean
   is_superuser?: boolean
   avatar_url?: string
+  gender?: GenderValue | null
 }
 
 export interface UserListParams {
@@ -45,6 +49,7 @@ export interface UserListParams {
   email?: string
   is_active?: boolean
   role_ids?: number[]
+  gender?: GenderValue | null
   skip?: number
   limit?: number
 }

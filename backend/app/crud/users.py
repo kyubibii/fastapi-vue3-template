@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlmodel import select
 
+from app.constants import GenderEnum
 from app.core.security import get_password_hash, verify_password
 from app.crud.base import CRUDServiceBase
 from app.models.rbac import Role, UserRole
@@ -54,6 +55,8 @@ class UserCRUDService(
             query = query.where(cast(Any, User.email).contains(filters.email))
         if filters.is_active is not None:
             query = query.where(User.is_active == filters.is_active)
+        if filters.gender is not None:
+            query = query.where(User.gender == filters.gender)
         if filters.role_ids:
             role_user_ids = select(UserRole.user_id).where(
                 cast(Any, UserRole.role_id).in_(filters.role_ids)
@@ -168,12 +171,14 @@ async def get_users(
     email: str | None = None,
     is_active: bool | None = None,
     role_ids: list[int] | None = None,
+    gender: GenderEnum | None = None,
 ) -> tuple[list[User], int]:
     filters = UserListFilter(
         username=username,
         email=email,
         is_active=is_active,
         role_ids=role_ids or [],
+        gender=gender,
     )
     users, count = await service.get_multi(
         session=session,
@@ -252,12 +257,14 @@ async def get_all_users_for_export(
     email: str | None = None,
     is_active: bool | None = None,
     role_ids: list[int] | None = None,
+    gender: GenderEnum | None = None,
 ) -> list[User]:
     filters = UserListFilter(
         username=username,
         email=email,
         is_active=is_active,
         role_ids=role_ids or [],
+        gender=gender,
     )
     return await service.get_all_for_export(session=session, filters=filters)
 

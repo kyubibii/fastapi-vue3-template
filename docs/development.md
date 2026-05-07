@@ -37,6 +37,29 @@ API 网关 (Nginx 反向代理 + 路由守卫)
 
 ---
 
+## 🔖 内置枚举与数据字典
+
+### 选型规则
+
+- 固定业务语义（例如 `gender`、状态机）使用后端内置枚举：`backend/app/constants/enums.py`。
+- 可运营配置项（可在后台频繁增删改）使用数据字典表（`dictionary_type` / `dictionary_item`）。
+
+### 自动同步机制（后端 -> 前端）
+
+- 后端枚举变更后，执行前端同步命令：`pnpm run enums:sync`。
+- 同步命令会调用后端导出脚本：`backend/scripts/export_enums.py`。
+- 生成文件：`frontend/src/constants/generated/enums.gen.ts`（自动生成，不手改）。
+- 前端业务常量从 `frontend/src/constants/` 统一导出并消费。
+
+### 开发流程
+
+1. 修改 `backend/app/constants/enums.py`。
+2. 运行 `pnpm run enums:sync`。
+3. 运行 `pnpm build` 或 `pnpm dev` 验证。
+4. 提交后端枚举变更和生成后的前端枚举文件。
+
+---
+
 ## 📝 添加新功能的完整流程
 
 本例演示如何添加一个"评论"功能。
