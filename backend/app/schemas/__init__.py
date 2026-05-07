@@ -1,5 +1,17 @@
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.audit_log import AuditLogPublic, AuditLogsPublic
+from app.schemas.dictionary import (
+    DictionaryItemCreate,
+    DictionaryItemPublic,
+    DictionaryItemsPublic,
+    DictionaryItemUpdate,
+    DictionaryOptionItemPublic,
+    DictionaryOptionsPublic,
+    DictionaryTypeCreate,
+    DictionaryTypePublic,
+    DictionaryTypesPublic,
+    DictionaryTypeUpdate,
+)
 from app.schemas.item import ItemCreate, ItemPublic, ItemsPublic, ItemUpdate
 from app.schemas.rbac import (
     AssignRolePermissions,
@@ -37,6 +49,16 @@ __all__ = [
     "TokenResponse",
     "AuditLogPublic",
     "AuditLogsPublic",
+    "DictionaryTypeCreate",
+    "DictionaryTypePublic",
+    "DictionaryTypesPublic",
+    "DictionaryTypeUpdate",
+    "DictionaryItemCreate",
+    "DictionaryItemPublic",
+    "DictionaryItemsPublic",
+    "DictionaryItemUpdate",
+    "DictionaryOptionItemPublic",
+    "DictionaryOptionsPublic",
     "ItemCreate",
     "ItemPublic",
     "ItemsPublic",

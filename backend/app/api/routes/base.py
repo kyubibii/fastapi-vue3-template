@@ -184,12 +184,18 @@ class CRUDRouterBase(
             body: create_schema,  # type: ignore[valid-type]
             current_user: User = Depends(permission_required(permissions["create"])),
         ) -> PublicSchemaT:
-            created = await service.create(
-                session=session,
-                obj_in=body,
-                created_by=current_user.id,
-                **self.build_create_kwargs(current_user=current_user, body=body),
-            )
+            try:
+                created = await service.create(
+                    session=session,
+                    obj_in=body,
+                    created_by=current_user.id,
+                    **self.build_create_kwargs(current_user=current_user, body=body),
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                )
             return self.to_public(created)
 
         @router.get(
@@ -229,12 +235,18 @@ class CRUDRouterBase(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=self.not_found_detail(),
                 )
-            updated = await service.update(
-                session=session,
-                db_obj=db_obj,
-                obj_in=body,
-                updated_by=current_user.id,
-            )
+            try:
+                updated = await service.update(
+                    session=session,
+                    db_obj=db_obj,
+                    obj_in=body,
+                    updated_by=current_user.id,
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                )
             return self.to_public(updated)
 
         @router.delete(
@@ -254,10 +266,16 @@ class CRUDRouterBase(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=self.not_found_detail(),
                 )
-            await service.delete(
-                session=session,
-                db_obj=db_obj,
-                deleted_by=current_user.id,
-            )
+            try:
+                await service.delete(
+                    session=session,
+                    db_obj=db_obj,
+                    deleted_by=current_user.id,
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                )
 
         return router
