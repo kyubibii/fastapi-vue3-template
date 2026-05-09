@@ -8,7 +8,7 @@ and their JSON aliases are accepted.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------------------------------------------------------------------------
@@ -88,13 +88,14 @@ class JsapiPrepayResponse(BaseModel):
 
 class WxPaymentParams(BaseModel):
     """The five fields needed by ``wx.requestPayment()``."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
     time_stamp: str = Field(alias="timeStamp")
     nonce_str: str = Field(alias="nonceStr")
     package: str
     sign_type: str = Field(alias="signType", default="RSA")
     pay_sign: str = Field(alias="paySign")
-
-    model_config = {"populate_by_name": True}
 
 
 # ---------------------------------------------------------------------------

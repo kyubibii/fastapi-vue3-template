@@ -130,7 +130,7 @@ sequenceDiagram
 | `attach` | 可选，附加数据，回调原样带回。 |
 | `time_expire` | 可选，支付结束时间（RFC3339）。 |
 
-响应中的 `payment_params`（类型 `WxPaymentParams`）需传给 `wx.requestPayment`。字段与小程序一致时为：`timeStamp`、`nonceStr`、`package`、`signType`、`paySign`（若 HTTP JSON 使用蛇形命名，则对应 `time_stamp`、`nonce_str`、`sign_type`、`pay_sign`，仍以接口实际返回字段名为准）。
+响应中的 `payment_params`（类型 `WxPaymentParams`）JSON 使用微信侧字段名：`timeStamp`、`nonceStr`、`package`、`signType`、`paySign`，可直接解构给 `wx.requestPayment`（路由已启用 `response_model_by_alias=True`）。
 
 小程序示例（需在用户点击支付等时机调用）：
 

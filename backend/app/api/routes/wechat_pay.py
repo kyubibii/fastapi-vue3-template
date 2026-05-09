@@ -88,6 +88,7 @@ _NOTIFY_FAIL = {"code": "FAIL", "message": "失败"}
 @router.post(
     "/prepay",
     response_model=PrepayResponseBody,
+    response_model_by_alias=True,
     summary="创建预支付订单",
     description="调用微信 JSAPI 统一下单，返回小程序/JSAPI 调起支付所需的五个参数。",
 )
