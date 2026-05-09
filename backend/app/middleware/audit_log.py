@@ -5,7 +5,9 @@ import traceback
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeVar, cast
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -45,6 +47,35 @@ _MAX_BODY_BYTES = 10_240
 
 # Matches AuditLog.error_message max_length
 _MAX_ERROR_MSG_CHARS = 2000
+
+_AUDIT_EXEMPT_ATTR = "__audit_log_exempt__"
+
+
+def audit_log_exempt(func: F) -> F:
+    """Mark a route handler so AuditLogMiddleware does not persist it as an audit entry."""
+
+    setattr(func, _AUDIT_EXEMPT_ATTR, True)
+    return func
+
+
+def _endpoint_marked_exempt(endpoint: Callable[..., Any]) -> bool:
+    """Follow FastAPI/wrapper chains so the marker survives nested decorators."""
+
+    seen: set[int] = set()
+    current: Any = endpoint
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if getattr(current, _AUDIT_EXEMPT_ATTR, False):
+            return True
+        current = getattr(current, "__wrapped__", None)
+    return False
+
+
+def _is_audit_exempt(request: Request) -> bool:
+    route = request.scope.get("route")
+    if not isinstance(route, APIRoute):
+        return False
+    return _endpoint_marked_exempt(route.endpoint)
 
 
 def _truncate_error_message(text: str, max_chars: int = _MAX_ERROR_MSG_CHARS) -> str:
@@ -145,6 +176,8 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
     """
     Intercept every non-GET, non-skip request and record an AuditLog entry.
 
+    Handlers may opt out with ``@audit_log_exempt`` (see ``audit_log_exempt``).
+
     Storage: always writes to DB. Optionally appends a JSON Lines file when
     settings.LOG_TO_FILE is True.
     """
@@ -181,6 +214,8 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
         except Exception:
+            if _is_audit_exempt(request):
+                raise
             duration_ms = int((time.monotonic() - start) * 1000)
             ip_address = _client_ip(request)
             log_entry = AuditLog(
@@ -208,6 +243,14 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         async for chunk in body_iterator:
             resp_chunks.append(chunk)
         resp_body = b"".join(resp_chunks)
+
+        if _is_audit_exempt(request):
+            return Response(
+                content=resp_body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type,
+            )
 
         duration_ms = int((time.monotonic() - start) * 1000)
         ip_address = _client_ip(request)

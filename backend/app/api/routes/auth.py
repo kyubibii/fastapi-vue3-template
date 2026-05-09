@@ -12,6 +12,7 @@ from app.core.security import (
     hash_token,
 )
 from app.crud.users import authenticate
+from app.middleware.audit_log import audit_log_exempt
 from app.models.auth import RefreshToken
 from app.schemas.auth import LoginRequest, TokenResponse
 
@@ -83,6 +84,7 @@ async def login(
     summary="刷新访问令牌",
     description="使用刷新令牌换取新的访问令牌和刷新令牌。",
 )
+@audit_log_exempt
 async def refresh_token(
     response: Response,
     session: SessionDep,
