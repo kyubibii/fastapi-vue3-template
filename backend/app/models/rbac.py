@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime
 from sqlmodel import Field, SQLModel
+
+from app.core.db_types import UtcDateTime
 
 
 def _utcnow() -> datetime:
@@ -105,5 +106,5 @@ class UserRole(SQLModel, table=True):
     role_id: int = Field(foreign_key="role.id", primary_key=True)
     created_at: datetime = Field(
         default_factory=_utcnow,
-        sa_type=DateTime(timezone=True),  # type: ignore[call-arg]
+        sa_type=UtcDateTime(),  # type: ignore[call-arg]
     )

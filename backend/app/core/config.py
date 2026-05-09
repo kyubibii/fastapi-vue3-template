@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
 
+    #: IANA 时区名（如 Asia/Shanghai）。为空则接口中无时区的 datetime 按 **运行主机本地时区** 解释。
+    APP_TIMEZONE: str = ""
+
     BACKEND_CORS_ORIGINS: Annotated[
         list[AnyUrl] | str, BeforeValidator(parse_cors)
     ] = []

@@ -1,8 +1,9 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime
 from sqlmodel import Field, SQLModel
+
+from app.core.db_types import UtcDateTime
 
 
 def utcnow() -> datetime:
@@ -29,13 +30,13 @@ class AuditBase(SQLModel):
 
     created_at: datetime = Field(  # type: ignore[call-overload]
         default_factory=utcnow,
-        sa_type=DateTime(timezone=True),
+        sa_type=UtcDateTime(),
     )
     created_by: uuid.UUID | None = Field(default=None)
 
     updated_at: datetime | None = Field(  # type: ignore[call-overload]
         default=None,
-        sa_type=DateTime(timezone=True),
+        sa_type=UtcDateTime(),
     )
     updated_by: uuid.UUID | None = Field(default=None)
 
@@ -43,6 +44,6 @@ class AuditBase(SQLModel):
 
     deleted_at: datetime | None = Field(  # type: ignore[call-overload]
         default=None,
-        sa_type=DateTime(timezone=True),
+        sa_type=UtcDateTime(),
     )
     deleted_by: uuid.UUID | None = Field(default=None)

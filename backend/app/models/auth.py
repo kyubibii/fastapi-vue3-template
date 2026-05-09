@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime
 from sqlmodel import Field, SQLModel
+
+from app.core.db_types import UtcDateTime
 
 
 def _utcnow() -> datetime:
@@ -28,15 +29,15 @@ class RefreshToken(SQLModel, table=True):
     # Stored as a plain UUID; no FK constraint to simplify cascade logic
     user_id: uuid.UUID = Field(index=True)
     expires_at: datetime = Field(
-        sa_type=DateTime(timezone=True),  # type: ignore[call-arg]
+        sa_type=UtcDateTime(),  # type: ignore[call-arg]
     )
     revoked_at: datetime | None = Field(
         default=None,
-        sa_type=DateTime(timezone=True),  # type: ignore[call-arg]
+        sa_type=UtcDateTime(),  # type: ignore[call-arg]
     )
     # Optional: browser / device identifier for session listing
     device_info: str | None = Field(default=None, max_length=500)
     created_at: datetime = Field(
         default_factory=_utcnow,
-        sa_type=DateTime(timezone=True),  # type: ignore[call-arg]
+        sa_type=UtcDateTime(),  # type: ignore[call-arg]
     )

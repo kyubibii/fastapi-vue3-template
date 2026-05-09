@@ -1,7 +1,9 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, Text
+from sqlalchemy import Column, Text
+
+from app.core.db_types import UtcDateTime
 from sqlmodel import Field, SQLModel
 
 
@@ -50,5 +52,5 @@ class AuditLog(SQLModel, table=True):
     tags: str | None = Field(default=None, max_length=200)
 
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), default=_utcnow, index=True, nullable=False)
+        sa_column=Column(UtcDateTime(), default=_utcnow, index=True, nullable=False)
     )
