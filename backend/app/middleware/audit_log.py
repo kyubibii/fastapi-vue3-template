@@ -50,7 +50,8 @@ _MAX_ERROR_MSG_CHARS = 2000
 def _truncate_error_message(text: str, max_chars: int = _MAX_ERROR_MSG_CHARS) -> str:
     if len(text) <= max_chars:
         return text
-    return text[: max_chars - 1] + "…"
+    # Python tracebacks place the root exception at the end; keep the suffix so logs stay actionable.
+    return "…" + text[-(max_chars - 1) :]
 
 
 def _client_ip(request: Request) -> str | None:
