@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import traceback
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -41,6 +42,22 @@ _SENSITIVE_KEYS = frozenset(
 
 # Max body size stored in DB (10 KB)
 _MAX_BODY_BYTES = 10_240
+
+# Matches AuditLog.error_message max_length
+_MAX_ERROR_MSG_CHARS = 2000
+
+
+def _truncate_error_message(text: str, max_chars: int = _MAX_ERROR_MSG_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1] + "…"
+
+
+def _client_ip(request: Request) -> str | None:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else None
 
 
 def _extract_module(path: str) -> str | None:
@@ -88,6 +105,41 @@ def _sanitize_body(raw: bytes) -> str | None:
         return _truncate(raw.decode("utf-8", errors="replace"))
 
 
+def _append_file_log(entry: AuditLog) -> None:
+    try:
+        log_path = Path(settings.LOG_FILE_PATH)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(
+            {
+                "id": str(entry.id),
+                "user_id": str(entry.user_id) if entry.user_id else None,
+                "method": entry.http_method,
+                "endpoint": entry.endpoint,
+                "status": entry.status_code,
+                "duration_ms": entry.duration_ms,
+                "ip": entry.ip_address,
+                "error_message": entry.error_message,
+                "ts": entry.created_at.isoformat(),
+            },
+            ensure_ascii=False,
+        )
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception as exc:
+        logger.warning("AuditLogMiddleware: file write failed — %s", exc)
+
+
+async def _persist_audit_entry(entry: AuditLog) -> None:
+    try:
+        async with async_session_maker() as session:
+            session.add(entry)
+            await session.commit()
+    except Exception as exc:
+        logger.warning("AuditLogMiddleware: DB write failed — %s", exc)
+    if settings.LOG_TO_FILE:
+        _append_file_log(entry)
+
+
 class AuditLogMiddleware(BaseHTTPMiddleware):
     """
     Intercept every non-GET, non-skip request and record an AuditLog entry.
@@ -125,7 +177,29 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                     pass
 
         # Forward to actual handler
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            ip_address = _client_ip(request)
+            log_entry = AuditLog(
+                user_id=user_id,
+                username=username,
+                http_method=request.method,
+                endpoint=str(request.url.path),
+                module=_extract_module(str(request.url.path)),
+                operation=_extract_operation(request),
+                request_body=_sanitize_body(req_body),
+                response_body=None,
+                status_code=500,
+                duration_ms=duration_ms,
+                error_message=_truncate_error_message(traceback.format_exc()),
+                ip_address=ip_address,
+                user_agent=request.headers.get("user-agent"),
+            )
+            await _persist_audit_entry(log_entry)
+            raise
+
         body_iterator = cast(Any, getattr(response, "body_iterator"))
 
         # Capture response body
@@ -135,14 +209,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         resp_body = b"".join(resp_chunks)
 
         duration_ms = int((time.monotonic() - start) * 1000)
-
-        # Get client IP (respect X-Forwarded-For from reverse proxy)
-        forwarded_for = request.headers.get("x-forwarded-for")
-        ip_address = (
-            forwarded_for.split(",")[0].strip()
-            if forwarded_for
-            else (request.client.host if request.client else None)
-        )
+        ip_address = _client_ip(request)
 
         log_entry = AuditLog(
             user_id=user_id,
@@ -159,17 +226,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             user_agent=request.headers.get("user-agent"),
         )
 
-        # Persist to DB (fire-and-forget; do not let DB errors break the response)
-        try:
-            async with async_session_maker() as session:
-                session.add(log_entry)
-                await session.commit()
-        except Exception as exc:
-            logger.warning("AuditLogMiddleware: DB write failed — %s", exc)
-
-        # Optionally append to JSON Lines file
-        if settings.LOG_TO_FILE:
-            _append_file_log(log_entry)
+        await _persist_audit_entry(log_entry)
 
         # Rebuild response (body was consumed above)
         return Response(
@@ -178,26 +235,3 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             headers=dict(response.headers),
             media_type=response.media_type,
         )
-
-
-def _append_file_log(entry: AuditLog) -> None:
-    try:
-        log_path = Path(settings.LOG_FILE_PATH)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        line = json.dumps(
-            {
-                "id": str(entry.id),
-                "user_id": str(entry.user_id) if entry.user_id else None,
-                "method": entry.http_method,
-                "endpoint": entry.endpoint,
-                "status": entry.status_code,
-                "duration_ms": entry.duration_ms,
-                "ip": entry.ip_address,
-                "ts": entry.created_at.isoformat(),
-            },
-            ensure_ascii=False,
-        )
-        with log_path.open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except Exception as exc:
-        logger.warning("AuditLogMiddleware: file write failed — %s", exc)
