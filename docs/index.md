@@ -88,13 +88,18 @@
    - Alembic 迁移错误
    - 虚拟环境问题
 
+6. **[微信支付 JSAPI / 小程序接入](wechat-pay-jsapi.md)** - 支付对接必读
+   - 商户侧与后台配置项（必填项清单）
+   - 小程序 `openid`、`wx.requestPayment`、回调 URL 说明
+   - 与模板内置 `wechat_pay` 路由、SDK 的对应关系
+
 **核心代码位置：**
 - 入口：`backend/app/main.py` - FastAPI 应用入口
 - 配置：`backend/app/core/` - 数据库、安全、运行时配置
 - 模型：`backend/app/models/` - SQLModel 数据模型（对应数据库表）
 - Schema：`backend/app/schemas/` - Pydantic 请求/响应验证
 - CRUD：`backend/app/crud/` - 数据库操作（Create、Read、Update、Delete）
-- 路由：`backend/app/api/routes/` - FastAPI 路由与业务逻辑
+- 路由：`backend/app/api/routes/` - FastAPI 路由与业务逻辑（含 `wechat_pay.py` 微信支付示例）
 - 依赖注入：`backend/app/api/deps.py` - 认证、权限、数据库会话注入
 - 中间件：`backend/app/middleware/` - 审计日志拦截
 - 迁移：`backend/app/alembic/` - Alembic 版本管理
@@ -213,7 +218,8 @@ docs/
 ├── quick-start.md              # 快速开始（初次启动必读）
 ├── development.md              # 开发指南（添加功能必读）
 ├── architecture.md             # 架构设计（理解系统必读）
-└── deployment.md               # 部署指南（生产部署必读）
+├── deployment.md               # 部署指南（生产部署必读）
+└── wechat-pay-jsapi.md         # 微信支付 JSAPI / 小程序接入
 
 项目根目录/
 ├── README.md                   # 项目总览（功能与技术栈）

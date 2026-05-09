@@ -229,6 +229,7 @@ function groupLabel(group: string): string {
     feature: "功能开关",
     email: "邮件配置",
     security: "安全配置",
+    wechat_pay: "微信支付",
   };
   return map[group] ?? group;
 }
