@@ -31,22 +31,22 @@
 
 ## 3. 配置项说明（系统设置 → 微信支付）
 
-所有配置项通过管理后台 **「系统设置 → 配置项管理 → 微信支付」** 分组维护（种子数据定义于 `backend/app/core/config.py` 的 `SETTINGS_BOOTSTRAP_ITEMS`）。
+所有配置项通过管理后台 **「系统设置 → 配置项管理 → 微信支付」** 分组维护（种子数据定**w**义于 `backend/app/core/config.py` 的 `SETTINGS_BOOTSTRAP_ITEMS`）。
 
 ### 3.1 必填配置项（缺一不可）
 
 以下八项若缺失或错误，将导致 **统一下单失败、签名失败或回调无法解密**。
 
-| 配置键（setting_name） | 含义 |
-|--------------------------|------|
-| `wechat_pay_app_id` | 与商户号绑定的 **小程序或公众号 AppID**（与下单时使用的 appid 一致）。 |
-| `wechat_pay_mch_id` | 微信支付 **商户号**。 |
-| `wechat_pay_api_v3_key` | **API v3 密钥**（32 字节字符串），用于解密回调通知中的加密资源。标记为敏感且加密存储。 |
-| `wechat_pay_cert_serial` | 商户 API 证书的 **序列号**，用于请求头 `Authorization` 中的 `serial_no`。 |
-| `wechat_pay_private_key` | 商户 API 证书的 **私钥 PEM** 全文。用于请求签名及生成小程序调起支付的 `paySign`。标记为敏感且加密存储。 |
-| `wechat_pay_public_key_id` | 微信支付 **平台公钥 ID**，对应应答头 `Wechatpay-Serial` 等校验场景。 |
-| `wechat_pay_public_key` | 微信支付 **平台公钥 PEM** 全文，用于校验微信支付应答签名及回调通知签名。标记为敏感且加密存储。 |
-| `wechat_pay_notify_base_url` | **回调通知基础 URL**（协议 + 域名，可选端口；不含 `/api/v1` 路径）。下文说明如何拼出完整回调地址。 |
+| 配置键（setting_name）         | 含义                                                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `wechat_pay_app_id`          | 与商户号绑定的**小程序或公众号 AppID**（与下单时使用的 appid 一致）。                                    |
+| `wechat_pay_mch_id`          | 微信支付**商户号**。                                                                                     |
+| `wechat_pay_api_v3_key`      | **API v3 密钥**（32 字节字符串），用于解密回调通知中的加密资源。标记为敏感且加密存储。                   |
+| `wechat_pay_cert_serial`     | 商户 API 证书的**序列号**，用于请求头 `Authorization` 中的 `serial_no`。                             |
+| `wechat_pay_private_key`     | 商户 API 证书的**私钥 PEM** 全文。用于请求签名及生成小程序调起支付的 `paySign`。标记为敏感且加密存储。 |
+| `wechat_pay_public_key_id`   | 微信支付**平台公钥 ID**，对应应答头 `Wechatpay-Serial` 等校验场景。                                    |
+| `wechat_pay_public_key`      | 微信支付**平台公钥 PEM** 全文，用于校验微信支付应答签名及回调通知签名。标记为敏感且加密存储。            |
+| `wechat_pay_notify_base_url` | **回调通知基础 URL**（协议 + 域名，可选端口；不含 `/api/v1` 路径）。下文说明如何拼出完整回调地址。     |
 
 ### 3.2 `wechat_pay_notify_base_url` 如何填写
 
@@ -69,14 +69,14 @@ wechat_pay_notify_base_url = https://pay.example.com
 
 基础路径：`/api/v1/wechat-pay/`（完整 URL 前缀取决于部署，一般为 `https://你的域名/api/v1/wechat-pay/`）。
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/prepay` | JSAPI 统一下单，返回 `payment_params`（供 `wx.requestPayment` 使用）。当前模板要求 **Bearer JWT**（见下文小程序对接）。 |
-| POST | `/notify/payment` | 微信支付异步通知（**勿**带应用 JWT；验签依赖 HTTP 头）。 |
-| POST | `/notify/refund` | 退款异步通知。 |
-| GET | `/orders/{out_trade_no}` | 按商户订单号查单。 |
-| POST | `/orders/{out_trade_no}/close` | 关单。 |
-| POST | `/refunds` | 发起退款。 |
+| 方法 | 路径                             | 说明                                                                                                                              |
+| ---- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| POST | `/prepay`                      | JSAPI 统一下单，返回 `payment_params`（供 `wx.requestPayment` 使用）。当前模板要求 **Bearer JWT**（见下文小程序对接）。 |
+| POST | `/notify/payment`              | 微信支付异步通知（**勿**带应用 JWT；验签依赖 HTTP 头）。                                                                    |
+| POST | `/notify/refund`               | 退款异步通知。                                                                                                                    |
+| GET  | `/orders/{out_trade_no}`       | 按商户订单号查单。                                                                                                                |
+| POST | `/orders/{out_trade_no}/close` | 关单。                                                                                                                            |
+| POST | `/refunds`                     | 发起退款。                                                                                                                        |
 
 OpenAPI 文档中可能隐藏回调路由；以源码 `app/api/routes/wechat_pay.py` 为准。
 
@@ -121,14 +121,14 @@ sequenceDiagram
 
 请求体字段（与 `PrepayRequestBody` 一致）：
 
-| 字段 | 说明 |
-|------|------|
+| 字段             | 说明                                     |
+| ---------------- | ---------------------------------------- |
 | `out_trade_no` | 商户侧订单号，6–32 字符，商户号内唯一。 |
-| `description` | 商品描述（用户账单可见）。 |
-| `total_amount` | 总金额，**单位：分**。 |
-| `openid` | 小程序用户在该小程序 AppID 下的 openid。 |
-| `attach` | 可选，附加数据，回调原样带回。 |
-| `time_expire` | 可选，支付结束时间（RFC3339）。 |
+| `description`  | 商品描述（用户账单可见）。               |
+| `total_amount` | 总金额，**单位：分**。             |
+| `openid`       | 小程序用户在该小程序 AppID 下的 openid。 |
+| `attach`       | 可选，附加数据，回调原样带回。           |
+| `time_expire`  | 可选，支付结束时间（RFC3339）。          |
 
 响应中的 `payment_params`（类型 `WxPaymentParams`）JSON 使用微信侧字段名：`timeStamp`、`nonceStr`、`package`、`signType`、`paySign`，可直接解构给 `wx.requestPayment`（路由已启用 `response_model_by_alias=True`）。
 
@@ -166,24 +166,24 @@ const res = await wx.requestPayment({
 
 ## 7. 相关源码位置
 
-| 模块 | 路径 |
-|------|------|
-| SDK 包 | `backend/app/services/wechat_pay/` |
-| HTTP 路由 | `backend/app/api/routes/wechat_pay.py` |
-| 默认配置种子 | `backend/app/core/config.py` → `SETTINGS_BOOTSTRAP_ITEMS` |
-| 运行时读取配置 | `backend/app/core/runtime_settings.py` |
+| 模块           | 路径                                                           |
+| -------------- | -------------------------------------------------------------- |
+| SDK 包         | `backend/app/services/wechat_pay/`                           |
+| HTTP 路由      | `backend/app/api/routes/wechat_pay.py`                       |
+| 默认配置种子   | `backend/app/core/config.py` → `SETTINGS_BOOTSTRAP_ITEMS` |
+| 运行时读取配置 | `backend/app/core/runtime_settings.py`                       |
 
 ---
 
 ## 8. 常见问题
 
-**Q：提示 APPID 与 mchid 不匹配？**  
+**Q：提示 APPID 与 mchid 不匹配？**
 A：检查商户平台是否已绑定该 AppID，且 `wechat_pay_app_id` 与小程序实际 AppID 一致。
 
-**Q：回调收不到？**  
+**Q：回调收不到？**
 A：检查 `wechat_pay_notify_base_url` 是否公网可达、路径是否为 `/api/v1/wechat-pay/notify/payment`，防火墙与负载均衡是否转发 POST 与原始 Body。
 
-**Q：验签失败？**  
+**Q：验签失败？**
 A：核对平台公钥与 `wechat_pay_public_key_id` 是否为同一组；API v3 密钥是否正确。
 
 ---
