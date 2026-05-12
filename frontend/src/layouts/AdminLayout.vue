@@ -155,6 +155,7 @@ function handleLogout() {
 <style scoped>
 .layout-container {
   height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -227,6 +228,9 @@ function handleLogout() {
 .main-content {
   background: #f8fafc;
   padding: 20px;
+  min-height: 0;
+  overflow: auto;
+  box-sizing: border-box;
 }
 
 .fade-enter-active,
