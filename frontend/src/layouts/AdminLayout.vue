@@ -160,6 +160,8 @@ function handleLogout() {
 .sidebar {
   background-color: #1e293b;
   transition: width 0.3s;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -168,6 +170,7 @@ function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   color: #f1f5f9;
   font-size: 16px;
   font-weight: 600;
@@ -180,6 +183,9 @@ function handleLogout() {
 
 .el-menu {
   border-right: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .header {
